@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2進数と(-2)の累乗表示</title>
+<style>
+:root{
+  --bg:#f6f7f9;--card:#fff;--fg:#1d2330;--sub:#667085;--line:#d9dde5;--acc:#2f6fed;--neg:#d6336c;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#12151c;--card:#1b2030;--fg:#e8ebf2;--sub:#98a2b3;--line:#323a50;--acc:#6b9bff;--neg:#ff7aa8;color-scheme:dark;}
+}
+:root[data-theme="dark"]{--bg:#12151c;--card:#1b2030;--fg:#e8ebf2;--sub:#98a2b3;--line:#323a50;--acc:#6b9bff;--neg:#ff7aa8;color-scheme:dark;}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;padding:16px;}
+main{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+h2{font-size:14px;margin:0 0 12px;color:var(--sub);font-weight:600}
+.top{text-align:center}
+input{font-size:32px;width:min(100%,260px);text-align:center;padding:8px 12px;border:2px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);font-variant-numeric:tabular-nums}
+input:focus{outline:none;border-color:var(--acc)}
+.hint{margin-top:8px;font-size:12px;color:var(--sub)}
+.scroll{overflow-x:auto}
+.row{display:flex;align-items:flex-end;justify-content:center;gap:4px;min-width:max-content;margin:0 auto}
+.cell{display:flex;flex-direction:column;align-items:center;width:52px}
+.w{font-size:12px;color:var(--sub);height:20px;font-variant-numeric:tabular-nums}
+.w.n{color:var(--neg)}
+.b{width:44px;height:52px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;border:1.5px solid var(--line);border-radius:8px;font-variant-numeric:tabular-nums}
+.b.on{border-color:var(--acc);color:var(--acc)}
+.sign{width:28px;height:52px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:var(--neg)}
+.note{margin-top:12px;font-size:13px;color:var(--sub);text-align:center;min-height:1.4em}
+</style>
+</head>
+<body>
+<main>
+  <section class="top">
+    <h2>整数を入力（-1023 〜 1023）</h2>
+    <input id="x" type="text" inputmode="numeric" autocomplete="off" value="0" aria-label="整数x">
+    <div class="hint">整数のみ入力できます</div>
+  </section>
+
+  <section>
+    <h2>xを15ビットの2進数で表示（負の場合は絶対値の2進数にマイナス）</h2>
+    <div class="scroll"><div class="row" id="bin"></div></div>
+  </section>
+
+  <section>
+    <h2>15ビットの2の補数表現（正のときは通常の2進数）</h2>
+    <div class="scroll"><div class="row" id="two"></div></div>
+  </section>
+
+  <section>
+    <h2>各桁（-1 または 0）× (-2)^q の合計がxになる組み合わせ</h2>
+    <div class="scroll"><div class="row" id="neg"></div></div>
+    <div class="note" id="note"></div>
+  </section>
+</main>
+
+<script>
+const N = 15;
+const MIN = -1023, MAX = 1023;
+const inp = document.getElementById('x');
+const binEl = document.getElementById('bin');
+const negEl = document.getElementById('neg');
+const twoEl = document.getElementById('two');
+const noteEl = document.getElementById('note');
+
+// 桁の重み
+const pow2 = Array.from({length:N}, (_, q) => 2 ** q);          // 1,2,4,8...
+const negPow = Array.from({length:N}, (_, q) => (-2) ** q);     // 1,-2,4,-8...
+
+function cell(weight, digit, opts = {}) {
+  const c = document.createElement('div');
+  c.className = 'cell';
+  const w = document.createElement('div');
+  w.className = 'w' + (weight < 0 ? ' n' : '');
+  w.textContent = weight;
+  const b = document.createElement('div');
+  b.className = 'b' + (opts.on ? ' on' : '');
+  b.textContent = digit;
+  c.append(w, b);
+  return c;
+}
+
+function renderEmpty() {
+  binEl.replaceChildren();
+  negEl.replaceChildren();
+  twoEl.replaceChildren();
+  for (let q = N - 1; q >= 0; q--) {
+    twoEl.append(cell(pow2[q], '–'));
+    binEl.append(cell(pow2[q], '–'));
+    negEl.append(cell(negPow[q], '–'));
+  }
+  noteEl.textContent = '';
+}
+
+function render(x) {
+  // 2段目：絶対値を15ビットの2進数に
+  binEl.replaceChildren();
+  const abs = Math.abs(x);
+  if (x < 0) {
+    const s = document.createElement('div');
+    s.className = 'sign';
+    s.textContent = '−';
+    binEl.append(s);
+  }
+  for (let q = N - 1; q >= 0; q--) {
+    const bit = (abs >> q) & 1;
+    binEl.append(cell(pow2[q], bit, {on: bit === 1}));
+  }
+
+  // 2の補数（15ビット）：負のときは 2^15 + x、正のときはそのまま
+  twoEl.replaceChildren();
+  const tc = x < 0 ? (1 << N) + x : x;
+  for (let q = N - 1; q >= 0; q--) {
+    const bit = (tc >> q) & 1;
+    twoEl.append(cell(pow2[q], bit, {on: bit === 1}));
+  }
+
+  // 全組み合わせ(2^15通り)を試す
+  let found = null;
+  for (let mask = 0; mask < (1 << N); mask++) {
+    let sum = 0;
+    for (let q = 0; q < N; q++) {
+      const d = (mask >> q) & 1 ? -1 : 0;
+      sum += d * negPow[q];
+    }
+    if (sum === x) { found = mask; break; }
+  }
+
+  negEl.replaceChildren();
+  if (found === null) {
+    for (let q = N - 1; q >= 0; q--) negEl.append(cell(negPow[q], '–'));
+    noteEl.textContent = '一致する組み合わせは見つかりませんでした';
+    return;
+  }
+  for (let q = N - 1; q >= 0; q--) {
+    const d = (found >> q) & 1 ? -1 : 0;
+    negEl.append(cell(negPow[q], d, {on: d === -1}));
+  }
+  noteEl.textContent = '';
+}
+
+let prev = '0';
+inp.addEventListener('input', () => {
+  let v = inp.value.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+                   .replace(/[−ー－]/g, '-');
+  // 整数のみ（先頭のマイナスは可）
+  if (!/^-?\d*$/.test(v)) { inp.value = prev; return; }
+  if (/^-?\d+$/.test(v)) {
+    const n = parseInt(v, 10);
+    if (n < MIN || n > MAX) { inp.value = prev; return; }
+  }
+  inp.value = v;
+  prev = v;
+  if (/^-?\d+$/.test(v)) {
+    render(parseInt(v, 10));
+  } else {
+    renderEmpty();
+  }
+});
+
+render(0);
+</script>
+</body>
+</html>
