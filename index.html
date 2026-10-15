@@ -38,7 +38,7 @@ input:focus{outline:none;border-color:var(--acc)}
 <body>
 <main>
   <section class="top">
-    <h2>整数を入力（- 〜 ）</h2>
+    <h2>整数を入力（-2047 〜 2047）</h2>
     <input id="x" type="text" inputmode="numeric" autocomplete="off" value="0" aria-label="整数x">
     <div class="hint">整数のみ入力できます</div>
   </section>
@@ -68,7 +68,7 @@ input:focus{outline:none;border-color:var(--acc)}
 
 <script>
 const N = 15;
-const MIN = -, MAX = ;
+const MIN = -2047, MAX = 2047;
 const inp = document.getElementById('x');
 const binEl = document.getElementById('bin');
 const negEl = document.getElementById('neg');
