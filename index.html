@@ -45,28 +45,32 @@ input:focus{outline:none;border-color:var(--acc)}
 
   <section>
     <h2>2進数（負の場合は絶対値の2進数にマイナス）</h2>
-    <h2>note:-65536|-65535~65535|65536</h2>
     <div class="scroll"><div class="row" id="bin"></div></div>
   </section>
 
   <section>
     <h2>2の補数表現_32768以上-32769以下だと正負がおかしいのでダメ</h2>
-    <h2>note:-32769|-32768~32767|32768</h2>
     <div class="scroll"><div class="row" id="two"></div></div>
   </section>
 
   <section>
     <h2>各桁（-1 または 0）× (-2)^q の合計がxになる組み合わせ</h2>
-    <h2>note:-21846|-21845~43690|43691</h2>
     <div class="scroll"><div class="row" id="neg"></div></div>
     <div class="note" id="note"></div>
   </section>
 
   <section>
     <h2>各桁（1 または 0）× (-2)^q の合計がxになる組み合わせ</h2>
-    <h2>note:-43691|-43690~21845|21846</h2>
     <div class="scroll"><div class="row" id="neg2"></div></div>
     <div class="note" id="note2"></div>
+  </section>
+
+  <section>
+    <h2>表現できる数の範囲（16bit）</h2>
+    <p>2進数（負は単にマイナスつける）_-65536|-65535~65535|65536</p>
+    <p>2の補数表現_-32769|-32768~32767|32768</p>
+    <p>各桁（-1or0）×(-2)^q_-21846|-21845~43690|43691</p>
+    <p>各桁（1or0）×(-2)^q_-43691|-43690~21845|21846</p>
   </section>
 </main>
 
