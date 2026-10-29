@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2進数と(-2)の累乗表示</title>
+<style>
+:root{
+  --bg:#f6f7f9;--card:#fff;--fg:#1d2330;--sub:#667085;--line:#d9dde5;--acc:#2f6fed;--neg:#d6336c;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#12151c;--card:#1b2030;--fg:#e8ebf2;--sub:#98a2b3;--line:#323a50;--acc:#6b9bff;--neg:#ff7aa8;color-scheme:dark;}
+}
+:root[data-theme="dark"]{--bg:#12151c;--card:#1b2030;--fg:#e8ebf2;--sub:#98a2b3;--line:#323a50;--acc:#6b9bff;--neg:#ff7aa8;color-scheme:dark;}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;padding:16px;}
+main{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+h2{font-size:14px;margin:0 0 12px;color:var(--sub);font-weight:600}
+.top{text-align:center}
+input{font-size:32px;width:min(100%,260px);text-align:center;padding:8px 12px;border:2px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);font-variant-numeric:tabular-nums}
+input:focus{outline:none;border-color:var(--acc)}
+.hint{margin-top:8px;font-size:12px;color:var(--sub)}
+.scroll{overflow-x:auto}
+.row{display:flex;align-items:flex-end;justify-content:center;gap:4px;min-width:max-content;margin:0 auto}
+.cell{display:flex;flex-direction:column;align-items:center;width:52px}
+.w{font-size:12px;color:var(--sub);height:20px;font-variant-numeric:tabular-nums}
+.w.n{color:var(--neg)}
+.b{width:44px;height:52px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;border:1.5px solid var(--line);border-radius:8px;font-variant-numeric:tabular-nums}
+.b.on{border-color:var(--acc);color:var(--acc)}
+.sign{width:28px;height:52px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:var(--neg)}
+.mode-button{margin-top:12px;padding:9px 14px;border:1px solid var(--acc);border-radius:9px;background:var(--acc);color:white;font-size:14px;cursor:pointer}
+.binary-point{width:2px;align-self:stretch;min-height:52px;background:var(--sub);margin:0 3px 0 1px;opacity:.65}
+.note{margin-top:12px;font-size:13px;color:var(--sub);text-align:center;min-height:1.4em}
+</style>
+</head>
+<body>
+<main>
+  <section class="top">
+    <h2 id="inputTitle">整数を入力（-4194304 〜 4194304）</h2>
+    <input id="x" type="text" inputmode="decimal" autocomplete="off" value="0" aria-label="数値x">
+    <div class="hint" id="inputHint">整数のみ入力できます</div>
+    <button class="mode-button" id="modeToggle" type="button">小数点以下8bit表示に切り替え</button>
+  </section>
+
+  <section>
+    <h2>2進数（負の場合は絶対値の2進数にマイナス）</h2>
+    <div class="scroll"><div class="row" id="bin"></div></div>
+  </section>
+
+  <section>
+    <h2>2の補数表現_32768以上-32769以下だと正負がおかしいのでダメ</h2>
+    <div class="scroll"><div class="row" id="two"></div></div>
+  </section>
+
+  <section>
+    <h2>各桁（-1 または 0）× (-2)^q の合計がxになる組み合わせ</h2>
+    <div class="scroll"><div class="row" id="neg"></div></div>
+    <div class="note" id="note"></div>
+  </section>
+
+  <section>
+    <h2>各桁（1 または 0）× (-2)^q の合計がxになる組み合わせ</h2>
+    <div class="scroll"><div class="row" id="neg2"></div></div>
+    <div class="note" id="note2"></div>
+  </section>
+
+  <section>
+    <h2>表現できる数の範囲（16bit）</h2>
+    <p>2進数（負は単にマイナスつける）_-65536|-65535~65535|65536</p>
+    <p>2の補数表現_-32769|-32768~32767|32768</p>
+    <p>各桁（-1or0）×(-2)^q_-21846|-21845~43690|43691</p>
+    <p>各桁（1or0）×(-2)^q_-43691|-43690~21845|21846</p>
+  </section>
+</main>
+
+<script>
+const N = 16;
+const FRAC = 8;
+const MIN = -4194304, MAX = 4194304;
+const inp = document.getElementById('x');
+const binEl = document.getElementById('bin');
+const negEl = document.getElementById('neg');
+const twoEl = document.getElementById('two');
+const neg2El = document.getElementById('neg2');
+const note2El = document.getElementById('note2');
+const noteEl = document.getElementById('note');
+const toggle = document.getElementById('modeToggle');
+const inputTitle = document.getElementById('inputTitle');
+const inputHint = document.getElementById('inputHint');
+let fractionalMode = false;
+let prev = '0';
+
+function cell(weight, digit, opts = {}) {
+  const c = document.createElement('div');
+  c.className = 'cell';
+  const w = document.createElement('div');
+  w.className = 'w' + (weight < 0 ? ' n' : '');
+  w.textContent = weight;
+  const b = document.createElement('div');
+  b.className = 'b' + (opts.on ? ' on' : '');
+  b.textContent = digit;
+  c.append(w, b);
+  return c;
+}
+function point(el) {
+  const p = document.createElement('div');
+  p.className = 'binary-point';
+  p.title = '小数点';
+  el.append(p);
+}
+function emptyRows(qMax, qMin) {
+  for (let q = qMax; q >= qMin; q--) {
+    if (q === -1) { point(binEl); point(twoEl); point(negEl); point(neg2El); }
+    const w = 2 ** q;
+    const nw = (-2) ** q;
+    binEl.append(cell(w, '–'));
+    twoEl.append(cell(w, '–'));
+    negEl.append(cell(nw, '–'));
+    neg2El.append(cell(nw, '–'));
+  }
+}
+function renderEmpty() {
+  [binEl, negEl, twoEl, neg2El].forEach(el => el.replaceChildren());
+  note2El.textContent = '';
+  noteEl.textContent = '';
+  emptyRows(fractionalMode ? N - 1 : N - 1, fractionalMode ? -FRAC : 0);
+}
+function negabaseDigits(value, count) {
+  // Return least-significant-first digits d in {0,1} such that sum(d[q]*(-2)^q)=value.
+  let n = value;
+  const digits = [];
+  for (let i = 0; i < count; i++) {
+    let r = ((n % 2) + 2) % 2;
+    digits.push(r);
+    n = (n - r) / -2;
+  }
+  return n === 0 ? digits : null;
+}
+function render(x) {
+  [binEl, negEl, twoEl, neg2El].forEach(el => el.replaceChildren());
+  noteEl.textContent = '';
+  note2El.textContent = '';
+  const fracBits = fractionalMode ? FRAC : 0;
+  const qMin = -fracBits;
+  const qMax = fractionalMode ? N + 7 : N - 1;
+  const scale = 2 ** fracBits;
+  const scaled = Math.round(x * scale);
+  const displayX = scaled / scale;
+  const count = qMax - qMin + 1;
+  const modulus = 2 ** count;
+
+  // Ordinary binary: sign plus magnitude, with a binary point in fractional mode.
+  if (x < 0) {
+    const sign = document.createElement('div');
+    sign.className = 'sign'; sign.textContent = '−'; binEl.append(sign);
+  }
+  const magnitude = Math.abs(scaled);
+  for (let q = qMax; q >= qMin; q--) {
+    if (q === -1) point(binEl);
+    const bit = Math.floor(magnitude / (2 ** (q + fracBits))) % 2;
+    binEl.append(cell(2 ** q, bit, {on: bit === 1}));
+  }
+
+  // Fixed-width two's complement: integer value scaled by 2^FRAC.
+  const tc = ((scaled % modulus) + modulus) % modulus;
+  for (let q = qMax; q >= qMin; q--) {
+    if (q === -1) point(twoEl);
+    const bit = Math.floor(tc / (2 ** (q + fracBits))) % 2;
+    twoEl.append(cell(2 ** q, bit, {on: bit === 1}));
+  }
+
+  // Digits {-1,0}: negate the canonical negabinary digits for -scaled.
+  const digitsNeg = negabaseDigits(-scaled, count);
+  if (!digitsNeg) {
+    for (let q = qMax; q >= qMin; q--) {
+      if (q === -1) point(negEl);
+      negEl.append(cell((-2) ** q, '–'));
+    }
+    noteEl.textContent = 'この桁数では表現できません';
+  } else {
+    for (let q = qMax; q >= qMin; q--) {
+      if (q === -1) point(negEl);
+      const d = -digitsNeg[q + fracBits];
+      negEl.append(cell((-2) ** q, d, {on: d === -1}));
+    }
+  }
+
+  // Digits {0,1}: canonical negabinary representation.
+  const digitsPos = negabaseDigits(scaled, count);
+  if (!digitsPos) {
+    for (let q = qMax; q >= qMin; q--) {
+      if (q === -1) point(neg2El);
+      neg2El.append(cell((-2) ** q, '–'));
+    }
+    note2El.textContent = 'この桁数では表現できません';
+  } else {
+    for (let q = qMax; q >= qMin; q--) {
+      if (q === -1) point(neg2El);
+      const d = digitsPos[q + fracBits];
+      neg2El.append(cell((-2) ** q, d, {on: d === 1}));
+    }
+  }
+  if (fractionalMode && displayX !== x) {
+    const msg = `小数点以下8bitに合わせて ${displayX} として表示しています（最小刻み 1/256）。`;
+    noteEl.textContent = [noteEl.textContent, msg].filter(Boolean).join(' ');
+  }
+}
+function normalizeInput(raw) {
+  return raw.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/[−ー－]/g, '-').replace(/[．。]/g, '.').replace(/，/g, ',').replace(',', '.');
+}
+function updateFromInput() {
+  const v = normalizeInput(inp.value);
+  if (!/^-?\d*(\.\d*)?$/.test(v)) { inp.value = prev; return; }
+  if (v !== '' && v !== '-' && v !== '.' && v !== '-.' && !/[.]$/.test(v)) {
+    const n = Number(v);
+    const min = MIN;
+    const max = MAX;
+    if (!Number.isFinite(n) || n < min || n > max) { inp.value = prev; return; }
+  }
+  inp.value = v;
+  prev = v;
+  if (/^-?(?:\d+\.?\d*|\.\d+)$/.test(v) && v !== '-' && v !== '.') render(Number(v));
+  else renderEmpty();
+}
+inp.addEventListener('input', updateFromInput);
+toggle.addEventListener('click', () => {
+  fractionalMode = !fractionalMode;
+  toggle.textContent = fractionalMode ? '整数表示に戻す' : '小数点以下8bit表示に切り替え';
+  inputTitle.textContent = fractionalMode ? '数値を入力（小数点以下8bitまで）' : '整数を入力（-4194304 〜 4194304）';
+  inputHint.textContent = fractionalMode ? '小数も入力できます。表現は1/256刻みに丸めます。' : '整数のみ入力できます';
+  inp.inputMode = fractionalMode ? 'decimal' : 'numeric';
+  updateFromInput();
+});
+render(0);
+</script>
+</body>
+</html>
